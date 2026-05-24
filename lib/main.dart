@@ -1,4 +1,8 @@
+// miscilaneous
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+// screens
 import 'package:quizler/screens/customize_quiz.dart';
 import 'package:quizler/screens/home_page.dart';
 import 'package:quizler/screens/login_screen.dart';
@@ -7,10 +11,15 @@ import 'package:quizler/screens/quiz_end.dart';
 import 'package:quizler/screens/quiz_generator.dart';
 import 'package:quizler/screens/registration_screen.dart';
 import 'package:quizler/screens/settings_page.dart';
-import 'package:provider/provider.dart';
 import 'package:quizler/screens/welcome_screen.dart';
 
-void main() {
+// firebase
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase/firebase_options.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(QuizlerApp());
 }
 
