@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "534326473731",
+    "project_id": "quizler-2f641",
+    "storage_bucket": "quizler-2f641.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:534326473731:android:8264ad300ea8eb77110a36",
+        "android_client_info": {
+          "package_name": "com.andelwood.quizler"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6iE60MXTUvbM2N-qiU5OrV6WnmTWg9Zw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
