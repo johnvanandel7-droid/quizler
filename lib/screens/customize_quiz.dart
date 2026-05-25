@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:quizler/quiz_provider.dart';
 import 'package:quizler/components/reusable_card.dart';
 import 'package:quizler/constants.dart';
+import 'package:quizler/models/questions.dart';
 
 class CustomizeQuiz extends StatefulWidget {
   const CustomizeQuiz({super.key});
@@ -10,47 +13,94 @@ class CustomizeQuiz extends StatefulWidget {
 }
 
 class _CustomizeQuizState extends State<CustomizeQuiz> {
-  // Use typed lists for better safety and functionality
   List<String> questionList = [];
-  List<bool?> answerList = []; // Nullable to handle unselected answers
-
-  // List of widgets with unique keys for state preservation
+  List<bool?> answerList = [];
+  late TextEditingController quizNameController;
+  late TextEditingController quizDescriptionController;
   final List<Widget> _questionWidgets = [];
 
   @override
   void initState() {
     super.initState();
+    quizNameController = TextEditingController();
+    quizDescriptionController = TextEditingController();
     _addQuestion();
   }
 
-  void saveQuiz() {
+  @override
+  void dispose() {
+    quizNameController.dispose();
+    quizDescriptionController.dispose();
+    super.dispose();
+  }
 
+  Future<void> saveQuiz() async {
+    if (quizNameController.text.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please enter a quiz name')));
+      return;
+    }
+
+    // Convert questionList and answerList to Question objects
+    List<Question> questions = [];
+    for (int i = 0; i < questionList.length; i++) {
+      if (questionList[i].isNotEmpty && answerList[i] != null) {
+        questions.add(Question(q: questionList[i], a: answerList[i]!));
+      }
+    }
+
+    if (questions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add at least one question')),
+      );
+      return;
+    }
+
+    final quizProvider = context.read<QuizProvider>();
+
+    final success = await quizProvider.createQuiz(
+      name: quizNameController.text,
+      description: quizDescriptionController.text,
+      questions: questions,
+      userId: 'current_user_id', // TODO: Integrate auth
+      difficulty: 3,
+    );
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Quiz saved successfully!')),
+        );
+        Navigator.pushNamed(context, 'home_page');
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Failed to save quiz')));
+      }
+    }
   }
 
   void _addQuestion() {
     setState(() {
       final index = _questionWidgets.length;
-      questionList.add(''); // Add empty question
-      answerList.add(null); // Add unselected answer
+      questionList.add('');
+      answerList.add(null);
       _questionWidgets.add(
         NewQuestionTemplate(
-          key: UniqueKey(), // Unique key to preserve state
+          key: UniqueKey(),
           questionNumber: index + 1,
           onQuestionChanged: (value) {
-            questionList[index] = value; // Update at specific index
+            questionList[index] = value;
           },
           onAnswerSelected: (isCorrect) {
-            answerList[index] = isCorrect; // Update at specific index
+            answerList[index] = isCorrect;
           },
           onDelete: () {
             setState(() {
               questionList.removeAt(index);
               answerList.removeAt(index);
               _questionWidgets.removeAt(index);
-              // Re-index remaining widgets
-              for (int i = 0; i < _questionWidgets.length; i++) {
-                
-              }
             });
           },
         ),
@@ -64,24 +114,15 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: Colors.blue,
-          title: const Text('Make Your Own Quiz'),
+          title: const Text('Create Quiz'),
           actions: [
             IconButton(
               icon: const Icon(Icons.close),
               color: Colors.black,
               onPressed: () {
-                setState(() {
-                  questionList.remove;
-                  answerList.remove;
-                  _questionWidgets.remove;
-                  // Re-index remaining widgets
-                  for (int i = 0; i < _questionWidgets.length; i++) {
-                
-                  }
-                });
                 Navigator.pushNamed(context, 'home_page');
               },
-            )
+            ),
           ],
         ),
         backgroundColor: Colors.blue[700],
@@ -92,26 +133,35 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
                 padding: const EdgeInsets.all(15.0),
                 child: Container(
                   color: Colors.blue,
-                  child: const Column(
+                  child: Column(
                     children: [
-                      Text(
-                        'Quiz Name',
-                        style: TextStyle(
-                          fontSize: 30,
-                          color: Colors.black,
+                      const Text(
+                        'Quiz Details',
+                        style: TextStyle(fontSize: 30, color: Colors.black),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: TextField(
+                          controller: quizNameController,
+                          decoration: kTextFieldDecoration2.copyWith(
+                            hintText: 'Quiz name',
+                          ),
                         ),
                       ),
                       Padding(
-                        padding: EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(20),
                         child: TextField(
-                          decoration: kTextFieldDecoration2,
+                          controller: quizDescriptionController,
+                          decoration: kTextFieldDecoration2.copyWith(
+                            hintText: 'Quiz description',
+                          ),
+                          maxLines: 3,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              // Spread the list directly (fixes the error and improves efficiency)
               ..._questionWidgets,
             ],
           ),
@@ -126,33 +176,16 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
                 style: kButtonStyle,
                 child: Text(
                   'Add Question',
-                  style: TextStyle(
-                    color: Colors.grey[700],
-                    fontSize: 15,
-                  ),
+                  style: TextStyle(color: Colors.grey[700], fontSize: 15),
                 ),
               ),
               const SizedBox(width: 40),
               TextButton(
                 style: kButtonStyle,
-                onPressed: () {
-                  if (questionList.any((q) => q.isEmpty) || answerList.contains(null)) {
-                    // Show error if incomplete
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please complete all questions and answers.')),
-                    );
-                  } 
-                  else {
-                    saveQuiz();
-                    Navigator.pushNamed(context, 'home_page');
-                  }
-                },
+                onPressed: saveQuiz,
                 child: const Text(
                   'Save',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 20,
-                  ),
+                  style: TextStyle(color: Colors.black, fontSize: 20),
                 ),
               ),
             ],
@@ -178,8 +211,7 @@ class NewQuestionTemplate extends StatefulWidget {
   });
 
   @override
-  // ignore: library_private_types_in_public_api
-  _NewQuestionTemplateState createState() => _NewQuestionTemplateState();
+  State<NewQuestionTemplate> createState() => _NewQuestionTemplateState();
 }
 
 class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
@@ -192,7 +224,6 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
       child: Container(
         color: Colors.blue,
         width: double.infinity,
-        height: 300,
         child: Column(
           children: [
             Padding(
@@ -200,19 +231,13 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(
-                      Icons.delete,
-                      color: Colors.red,
-                      size: 30.0,
-                    ),
-                    onPressed: widget.onDelete, // Fixed: Now invokes the callback
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 30),
+                    onPressed: widget.onDelete,
                   ),
                   const SizedBox(width: 20),
                   Text(
                     'Question ${widget.questionNumber}',
-                    style: const TextStyle(
-                      fontSize: 15,
-                    ),
+                    style: const TextStyle(fontSize: 15),
                   ),
                 ],
               ),
@@ -223,13 +248,8 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
                 decoration: const InputDecoration(
                   icon: Icon(Icons.question_mark),
                   hintText: 'Question',
-                  hintStyle: TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w300,
-                  ),
+                  hintStyle: TextStyle(color: Colors.grey),
                   border: OutlineInputBorder(),
-                  focusColor: Colors.blueGrey,
-                  iconColor: Colors.black,
                 ),
                 style: const TextStyle(
                   color: Colors.black,
@@ -243,24 +263,19 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
               padding: EdgeInsets.all(15),
               child: Text(
                 'Answer',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 20,
-                ),
+                style: TextStyle(color: Colors.grey, fontSize: 20),
               ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
+                children: [
                   Expanded(
                     child: ReusableCard(
                       onPress: () {
-                        setState(() {
-                          selectedAnswer = true;
-                        });
-                        widget.onAnswerSelected(true); // Notify parent
+                        setState(() => selectedAnswer = true);
+                        widget.onAnswerSelected(true);
                       },
                       colour: selectedAnswer == true
                           ? kTrueActiveCardColor
@@ -272,10 +287,8 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
                   Expanded(
                     child: ReusableCard(
                       onPress: () {
-                        setState(() {
-                          selectedAnswer = false;
-                        });
-                        widget.onAnswerSelected(false); // Notify parent
+                        setState(() => selectedAnswer = false);
+                        widget.onAnswerSelected(false);
                       },
                       colour: selectedAnswer == false
                           ? kFalseActiveCardColor
@@ -286,6 +299,7 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
                 ],
               ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

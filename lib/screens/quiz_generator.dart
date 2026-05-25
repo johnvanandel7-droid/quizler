@@ -1,157 +1,231 @@
 import 'package:flutter/material.dart';
-import 'package:quizler/question_info.dart';
+import 'package:provider/provider.dart';
+import 'package:quizler/quiz_provider.dart';
 import 'home_page.dart';
-
+ 
 double numberOfCorrectAnswers = 0;
 double numberOfIncorrectAnswers = 0;
-// ignore: non_constant_identifier_names
-QuestionInfo question_info = QuestionInfo();
-HomePage homePage = HomePage();
-
-class QuizPageGenerator extends StatefulWidget {
-
-  final String appBarText;
-  const QuizPageGenerator({super.key, required this.appBarText});
-
-  @override
-
-  // ignore: library_private_types_in_public_api
-  _QuizPageGeneratorState createState() => _QuizPageGeneratorState();
+ 
+class QuestionInfo {
+  int questionNumber = 0;
+  int quizLength = 0;
+ 
+  void nextQuestion() {
+    if (questionNumber < quizLength - 1) {
+      questionNumber++;
+    }
+  }
+ 
+  bool isFinished() {
+    return questionNumber >= quizLength - 1;
+  }
+ 
+  String getQuestionText() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return '';
+    
+    final currentQuiz = Provider.of<QuizProvider>(
+      context,
+      listen: false,
+    ).currentQuiz;
+ 
+    if (currentQuiz != null && questionNumber < currentQuiz.questionBank.length) {
+      return currentQuiz.questionBank[questionNumber].q;
+    }
+    return '';
+  }
+ 
+  bool getQuestionAnswer() {
+    final context = navigatorKey.currentContext;
+    if (context == null) return false;
+    
+    final currentQuiz = Provider.of<QuizProvider>(
+      context,
+      listen: false,
+    ).currentQuiz;
+ 
+    if (currentQuiz != null && questionNumber < currentQuiz.questionBank.length) {
+      return currentQuiz.questionBank[questionNumber].a;
+    }
+    return false;
+  }
 }
-
+ 
+// Global navigator key to access context
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+ 
+class QuizPageGenerator extends StatefulWidget {
+  const QuizPageGenerator({super.key});
+ 
+  @override
+  State<QuizPageGenerator> createState() => _QuizPageGeneratorState();
+}
+ 
 class _QuizPageGeneratorState extends State<QuizPageGenerator> {
-
-  List <Icon> scoreKeeper = [];
-
+  List<Icon> scoreKeeper = [];
+  late QuestionInfo questionInfo;
+ 
+  @override
+  void initState() {
+    super.initState();
+    questionInfo = QuestionInfo();
+    
+    final quizProvider = context.read<QuizProvider>();
+    if (quizProvider.currentQuiz != null) {
+      questionInfo.quizLength = quizProvider.currentQuiz!.questionBank.length;
+    }
+  }
+ 
   void checkAnswer(bool userPickedAnswer) {
-    bool correctAnswer = question_info.getQuestionAnswer();
-
+    final quizProvider = context.read<QuizProvider>();
+    final currentQuiz = quizProvider.currentQuiz;
+ 
+    if (currentQuiz == null) return;
+ 
+    bool correctAnswer = currentQuiz.questionBank[questionInfo.questionNumber].a;
+ 
     setState(() {
-
-      if (question_info.isFinished() == true) {
+      if (questionInfo.isFinished()) {
         Navigator.pushNamed(context, 'quiz_end');
         scoreKeeper = [];
-        question_info.questionNumber = 0;
-      }
-
-      else {
+        questionInfo.questionNumber = 0;
+      } else {
         if (userPickedAnswer == correctAnswer) {
-          numberOfCorrectAnswers ++;
-          scoreKeeper.add(Icon(
-            Icons.check,
-            color: Colors.green,
-          ));
-        } 
-        else {
-          numberOfIncorrectAnswers ++;
-          scoreKeeper.add(Icon(
-            Icons.close,
-            color: Colors.red,
-          ));
+          numberOfCorrectAnswers++;
+          scoreKeeper.add(
+            const Icon(Icons.check, color: Colors.green),
+          );
+        } else {
+          numberOfIncorrectAnswers++;
+          scoreKeeper.add(
+            const Icon(Icons.close, color: Colors.red),
+          );
         }
-        question_info.nextQuestion();
+        questionInfo.nextQuestion();
       }
     });
   }
-
+ 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.blue,
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title: Center(
-          child: Text(widget.appBarText)
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              setState(() {
-                question_info.questionNumber = 0;
-              });
-              Navigator.pushNamed(
-                context,
-                'home_page'
-              );
-            }, 
-            icon: Icon(
-              Icons.home,
-              color: Colors.black,
-              size: 20,
-          )
-          ),
-        ],
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Expanded(
-            flex: 5,
-            child: Padding(
-              padding: EdgeInsets.all(10.0),
-              child: Center(
-                child: Text(
-                  question_info.getQuestionText(currentQuiz),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 25.0,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
+    return Consumer<QuizProvider>(
+      builder: (context, quizProvider, _) {
+        final currentQuiz = quizProvider.currentQuiz;
+ 
+        if (currentQuiz == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Quiz'),
+              backgroundColor: Colors.blueGrey,
             ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(15.0),
-              child: TextButton(
-                style: ButtonStyle(
-                  shadowColor: WidgetStateProperty.all(Colors.black),
-                  backgroundColor: WidgetStateProperty.all(Colors.green),
-                ),
-                child: Text(
-                  'True',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20.0,
-                  ),
-                ),
+            body: const Center(
+              child: Text('No quiz selected'),
+            ),
+          );
+        }
+ 
+        String questionText = '';
+        if (questionInfo.questionNumber < currentQuiz.questionBank.length) {
+          questionText = currentQuiz.questionBank[questionInfo.questionNumber].q;
+        }
+ 
+        return Scaffold(
+          backgroundColor: Colors.blue,
+          appBar: AppBar(
+            backgroundColor: Colors.blueGrey,
+            title: Center(child: Text(currentQuiz.name)),
+            actions: [
+              IconButton(
                 onPressed: () {
-                  // the user chose True
-                  checkAnswer(true);
+                  setState(() {
+                    questionInfo.questionNumber = 0;
+                    numberOfCorrectAnswers = 0;
+                    numberOfIncorrectAnswers = 0;
+                    scoreKeeper = [];
+                  });
+                  Navigator.pushNamed(context, 'home_page');
                 },
-              ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.all(15.0),
-              child: TextButton(
-                style: ButtonStyle(
-                  backgroundColor: WidgetStateProperty.all(Colors.red),
-                  shadowColor: WidgetStateProperty.all(Colors.black),
+                icon: const Icon(
+                  Icons.home,
+                  color: Colors.black,
+                  size: 20,
                 ),
-                child: Text(
-                  'False',
-                  style: TextStyle(
-                    fontSize: 20.0,
-                    color: Colors.white,
+              ),
+            ],
+          ),
+          body: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Question display
+              Expanded(
+                flex: 5,
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: Center(
+                    child: Text(
+                      questionText,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 25.0,
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
-                onPressed: () {
-                  //The user picked false.
-                  checkAnswer(false);
-                },
               ),
-            ),
+              // True button
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(15.0),
+                  child: TextButton(
+                    style: ButtonStyle(
+                      shadowColor: WidgetStateProperty.all(Colors.black),
+                      backgroundColor: WidgetStateProperty.all(Colors.green),
+                    ),
+                    child: const Text(
+                      'True',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20.0,
+                      ),
+                    ),
+                    onPressed: () {
+                      checkAnswer(true);
+                    },
+                  ),
+                ),
+              ),
+              // False button
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(15.0),
+                  child: TextButton(
+                    style: ButtonStyle(
+                      backgroundColor: WidgetStateProperty.all(Colors.red),
+                      shadowColor: WidgetStateProperty.all(Colors.black),
+                    ),
+                    child: const Text(
+                      'False',
+                      style: TextStyle(
+                        fontSize: 20.0,
+                        color: Colors.white,
+                      ),
+                    ),
+                    onPressed: () {
+                      checkAnswer(false);
+                    },
+                  ),
+                ),
+              ),
+              // Score keeper
+              Row(children: scoreKeeper),
+              const SizedBox(height: 50),
+            ],
           ),
-          Row(
-            children: scoreKeeper,
-          ),
-          SizedBox(height: 50)
-        ],
-      ),
+        );
+      },
     );
   }
 }

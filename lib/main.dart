@@ -1,6 +1,7 @@
 // miscilaneous
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:quizler/quiz_provider.dart';
 
 // screens
 import 'package:quizler/screens/customize_quiz.dart';
@@ -15,7 +16,7 @@ import 'package:quizler/screens/welcome_screen.dart';
 
 // firebase
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase/firebase_options.dart';
+import 'services/firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +29,8 @@ class QuizlerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<ChangeSearchError>(
-      create: (_) => ChangeSearchError(),
+    return MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => QuizProvider())],
       child: MaterialApp(
         theme: ThemeData(
           colorScheme: ColorScheme(
@@ -54,8 +55,7 @@ class QuizlerApp extends StatelessWidget {
           'settings': (context) => SettingsPage(),
           'customize': (context) => CustomizeQuiz(),
           'quiz_end': (context) => QuizEnd(),
-          'quiz_generator': (context) =>
-              QuizPageGenerator(appBarText: quizName),
+          'quiz_generator': (context) => QuizPageGenerator(),
           'my_profile': (context) => MyProfile(),
         },
       ),

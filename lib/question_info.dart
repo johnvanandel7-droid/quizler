@@ -4,9 +4,7 @@ dynamic quizLength = currentQuiz.questionBank.length;
 dynamic questionAnswer = currentQuiz.questionBank;
 
 class QuestionInfo {
-
   int questionNumber = 0;
-
 
   void nextQuestion() {
     if (questionNumber < quizLength - 1) {
@@ -17,8 +15,7 @@ class QuestionInfo {
   bool isFinished() {
     if (questionNumber >= quizLength - 1) {
       return true;
-    } 
-    else {
+    } else {
       return false;
     }
   }
