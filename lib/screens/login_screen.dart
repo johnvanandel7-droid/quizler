@@ -60,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   tag: 'logo',
                   child: SizedBox(
                     height: 200.0,
-                    child: Image.asset('images/chat_icon.png'),
+                    child: Image.asset('images/question.jpg'),
                   ),
                 ),
               ),

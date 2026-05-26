@@ -156,9 +156,9 @@ class AddQuizButton extends StatelessWidget {
         style: ButtonStyle(
           backgroundColor: WidgetStatePropertyAll(Colors.blue[800]),
         ),
-        child: const Text(
-          ' ',
-          style: TextStyle(color: kTextColor, fontSize: 25),
+        child: Text(
+          name,
+          style: const TextStyle(color: kTextColor, fontSize: 25),
         ),
       ),
     );

@@ -58,7 +58,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   tag: 'logo',
                   child: SizedBox(
                     height: 60,
-                    child: Image.asset('images/chat_icon.png'),
+                    child: Image.asset('images/question.jpg'),
                   ),
                 ),
                 SizedBox(width: 20),
@@ -69,7 +69,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     fontWeight: FontWeight.w900,
                   ),
                   child: AnimatedTextKit(
-                    animatedTexts: [TypewriterAnimatedText('Chat Job')],
+                    animatedTexts: [TypewriterAnimatedText('Quizler')],
                   ),
                 ),
               ],

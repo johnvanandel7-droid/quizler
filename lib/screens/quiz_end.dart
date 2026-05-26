@@ -3,12 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quizler/quiz_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:quizler/screens/quiz_generator.dart';
 
 final auth = FirebaseAuth.instance;
-
-// Global score tracking
-double numberOfCorrectAnswers = 0;
-double numberOfIncorrectAnswers = 0;
 
 class QuizEnd extends StatefulWidget {
   const QuizEnd({super.key});

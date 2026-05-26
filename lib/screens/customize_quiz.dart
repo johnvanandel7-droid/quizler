@@ -4,6 +4,9 @@ import 'package:quizler/quiz_provider.dart';
 import 'package:quizler/components/reusable_card.dart';
 import 'package:quizler/constants.dart';
 import 'package:quizler/models/questions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+final _auth = FirebaseAuth.instance;
 
 class CustomizeQuiz extends StatefulWidget {
   const CustomizeQuiz({super.key});
@@ -63,7 +66,7 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
       name: quizNameController.text,
       description: quizDescriptionController.text,
       questions: questions,
-      userId: 'current_user_id', // TODO: Integrate auth
+      userId: _auth.currentUser?.uid ?? 'user not logged in',
       difficulty: 3,
     );
 

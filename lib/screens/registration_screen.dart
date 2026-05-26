@@ -208,24 +208,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 const SizedBox(height: 20),
-                Flexible(
-                  child: Hero(
-                    tag: 'logo',
-                    child: SizedBox(
-                      height: 120.0,
-                      child: Image.asset('images/chat_icon.png'),
-                    ),
-                  ),
-                ),
+                // Flexible(
+                //   child: Hero(
+                //     tag: 'logo',
+                //     child: SizedBox(
+                //       height: 120.0,
+                //       child: Image.asset('images/question.jpg'),
+                //     ),
+                //   ),
+                // ),
                 const SizedBox(height: 30),
                 const Text(
-                  'Join Chat Job',
+                  'Join Quizler',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Buy and sell items safely',
+                  'play and create quizes',
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
@@ -343,7 +343,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                           });
                         },
                         child: Text(
-                          'Send me offers and updates about Chat Job',
+                          'Send me offers and updates about Quizler',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[700],

@@ -12,7 +12,12 @@
           "package_name": "com.andelwood.quizler"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "534326473731-k5jjs7nl44n4l4pku7alj925mfac1208.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA6iE60MXTUvbM2N-qiU5OrV6WnmTWg9Zw"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "534326473731-k5jjs7nl44n4l4pku7alj925mfac1208.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
