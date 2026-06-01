@@ -30,6 +30,9 @@ dependencies:
   # State management
   provider: ^6.1.5
 
+  # random
+  timeago: ^3.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
