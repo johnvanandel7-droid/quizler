@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:quizler/models/questions.dart';
 import 'package:quizler/quiz_provider.dart';
 import 'package:quizler/question_info.dart';
 
@@ -16,6 +17,7 @@ class QuizPageGenerator extends StatefulWidget {
 
 class _QuizPageGeneratorState extends State<QuizPageGenerator> {
   late QuestionInfo questionInfo;
+  late List<Question> shuffledQuestions;
   List<Icon> scoreKeeper = [];
   bool _isAnswered = false;
 
@@ -41,10 +43,12 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
       return;
     }
 
+    // create a copy of the questions and shuffle them
+    shuffledQuestions = List.from(currentQuiz.questionBank);
+    shuffledQuestions.shuffle();
+
     // Initialize question info with quiz length
-    questionInfo = QuestionInfo(
-      initialQuizLength: currentQuiz.questionBank.length,
-    );
+    questionInfo = QuestionInfo(initialQuizLength: shuffledQuestions.length);
   }
 
   /// Check user's answer against correct answer
@@ -54,14 +58,12 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
     final quizProvider = context.read<QuizProvider>();
     final currentQuiz = quizProvider.currentQuiz;
 
-    if (currentQuiz == null || currentQuiz.questionBank.isEmpty) {
+    if (currentQuiz == null || shuffledQuestions.isEmpty) {
       return;
     }
 
     // Get correct answer for current question
-    final correctAnswer = questionInfo.getQuestionAnswer(
-      currentQuiz.questionBank,
-    );
+    final correctAnswer = questionInfo.getQuestionAnswer(shuffledQuestions);
 
     setState(() {
       _isAnswered = true; // Disable further answers
@@ -159,9 +161,7 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
         }
 
         // Get current question text safely
-        final questionText = questionInfo.getQuestionText(
-          currentQuiz.questionBank,
-        );
+        final questionText = questionInfo.getQuestionText(shuffledQuestions);
 
         return Scaffold(
           backgroundColor: Colors.blue,

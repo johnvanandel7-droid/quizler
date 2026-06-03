@@ -219,6 +219,7 @@ class NewQuestionTemplate extends StatefulWidget {
 
 class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
   bool? selectedAnswer;
+  bool isMultipleChoice = false;
 
   @override
   Widget build(BuildContext context) {
@@ -230,21 +231,42 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.all(10.0),
+              padding: EdgeInsets.all(10),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red, size: 30),
-                    onPressed: widget.onDelete,
+                  Checkbox(
+                    value: isMultipleChoice,
+                    onChanged: (value) {
+                      setState(() {
+                        isMultipleChoice = value ?? false;
+                      });
+                    },
                   ),
-                  const SizedBox(width: 20),
-                  Text(
-                    'Question ${widget.questionNumber}',
-                    style: const TextStyle(fontSize: 15),
-                  ),
+                  Text('Multiple choice Question'),
                 ],
               ),
             ),
+            if (isMultipleChoice == false)
+              Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete,
+                        color: Colors.red,
+                        size: 30,
+                      ),
+                      onPressed: widget.onDelete,
+                    ),
+                    const SizedBox(width: 20),
+                    Text(
+                      'Question ${widget.questionNumber}',
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(15),
               child: TextField(
@@ -303,6 +325,51 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
               ),
             ),
             const SizedBox(height: 20),
+            if (isMultipleChoice == true)
+              Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white70,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white70,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            Row(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white70,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white70,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

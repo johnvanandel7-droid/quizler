@@ -1,10 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quizler/components/app_bar.dart';
+import 'package:provider/provider.dart';
 import 'package:quizler/components/section_header.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:quizler/components/time_ago.dart';
 import 'package:quizler/screens/edit_quiz_screen.dart';
+import 'package:quizler/quiz_provider.dart';
+import 'package:quizler/models/quiz_model.dart';
 
 final auth = FirebaseAuth.instance;
 final firestore = FirebaseFirestore.instance;
@@ -18,6 +21,7 @@ class MyProfile extends StatefulWidget {
 
 class _MyProfileState extends State<MyProfile> {
   bool showQuizes = false;
+  bool showPlayingHistory = false;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +29,7 @@ class _MyProfileState extends State<MyProfile> {
       appBar: const ReusableAppBar(),
       body: Column(
         children: [
+          // header User name
           Padding(
             padding: EdgeInsets.all(15),
             child: Text(
@@ -32,6 +37,7 @@ class _MyProfileState extends State<MyProfile> {
               style: TextStyle(fontSize: 25),
             ),
           ),
+          // quizes section header
           SectionHeader(
             title: 'My Quizes',
             isExpanded: showQuizes,
@@ -41,8 +47,19 @@ class _MyProfileState extends State<MyProfile> {
               });
             },
           ),
-          if (showQuizes == true) MyQuizesList(),
-          if (showQuizes == false) SizedBox(),
+          if (showQuizes == true) const MyQuizesList(),
+          if (showQuizes == false) const SizedBox(),
+          // playing history section
+          SectionHeader(
+            title: 'My Playing History',
+            isExpanded: showPlayingHistory,
+            onToggle: () {
+              setState(() {
+                showPlayingHistory = !showPlayingHistory;
+              });
+            },
+          ),
+          if (showPlayingHistory == true) Text('hi') else const SizedBox(),
         ],
       ),
     );
@@ -58,50 +75,64 @@ class MyQuizesList extends StatelessWidget {
       stream: firestore
           .collection('quizzes')
           .where('createdBy', isEqualTo: auth.currentUser!.uid)
+          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
+        // loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        // error state
         if (snapshot.hasError) {
-          return Center(child: Text("Error: ${snapshot.error}"));
+          return Center(
+            child: Text(
+              "Error: ${snapshot.error}",
+              style: TextStyle(color: Colors.red),
+            ),
+          );
         }
 
+        // empty state
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text("No quizes yet"));
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text("No quizes yet"),
+            ),
+          );
         }
 
-        final docs = snapshot.data!.docs; // already ordered by query
+        final docs = snapshot.data!.docs;
 
-        List<QuizTemplate> quizes = [];
-
-        for (var doc in docs) {
-          try {
-            final data = doc.data() as Map<String, dynamic>;
-
-            final plays = data['plays'] as int;
-            final quizName = data['name'] as String;
-            final createdAt = data['createdAt'] as Timestamp;
-            final quizId = doc.id;
-
-            quizes.add(
-              QuizTemplate(
-                plays: plays,
-                quizName: quizName,
-                createdAt: createdAt,
-                quizId: quizId,
-              ),
-            );
-          } catch (e) {
-            print(e);
-          }
-        }
         return Expanded(
-          child: ListView(
-            reverse: false,
+          child: ListView.builder(
             padding: const EdgeInsets.all(10),
-            children: quizes,
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              try {
+                final doc = docs[index];
+                final data = doc.data() as Map<String, dynamic>;
+
+                // Safely parse data with defaults
+                final plays = (data['plays'] as int?) ?? 0;
+                final quizName = (data['name'] as String?) ?? 'Unnamed Quiz';
+                final createdAt =
+                    (data['createdAt'] as Timestamp?) ?? Timestamp.now();
+                final quizId = doc.id;
+
+                return QuizTemplate(
+                  plays: plays,
+                  quizName: quizName,
+                  createdAt: createdAt,
+                  quizId: quizId,
+                  quizDoc: doc, // Pass doc for Play Quiz functionality
+                );
+              } catch (e) {
+                print('Error parsing quiz: $e');
+                return const SizedBox.shrink();
+              }
+            },
           ),
         );
       },
@@ -114,6 +145,7 @@ class QuizTemplate extends StatefulWidget {
   final String quizName;
   final Timestamp createdAt;
   final String quizId;
+  final QueryDocumentSnapshot quizDoc;
 
   const QuizTemplate({
     super.key,
@@ -121,6 +153,7 @@ class QuizTemplate extends StatefulWidget {
     required this.quizName,
     required this.createdAt,
     required this.quizId,
+    required this.quizDoc,
   });
 
   @override
@@ -129,6 +162,8 @@ class QuizTemplate extends StatefulWidget {
 
 class _QuizTemplateState extends State<QuizTemplate> {
   bool showStats = false;
+  bool _isDeleting = false;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -142,16 +177,19 @@ class _QuizTemplateState extends State<QuizTemplate> {
         padding: EdgeInsets.all(10),
         child: Column(
           children: [
+            // Quiz name and date
             Row(
               children: [
-                Text(
-                  widget.quizName,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    widget.quizName,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 25,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const Spacer(),
                 Text(
@@ -160,6 +198,9 @@ class _QuizTemplateState extends State<QuizTemplate> {
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+
+            // Quiz stats section
             SectionHeader(
               title: 'quiz stats',
               isExpanded: showStats,
@@ -170,15 +211,22 @@ class _QuizTemplateState extends State<QuizTemplate> {
               },
             ),
             if (showStats == true)
-              Text(
-                'your quiz has been played ${widget.plays} times',
-                style: TextStyle(color: Colors.grey, fontSize: 20),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text(
+                  'Played ${widget.plays}${widget.plays == 1 ? 'time' : 'times'}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 20),
+                ),
               ),
+            const SizedBox(height: 15),
             if (showStats == false) SizedBox(),
             const SizedBox(height: 10),
+
+            // action buttons
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                // edit quiz button
                 ElevatedButton.icon(
                   onPressed: () {
                     Navigator.push(
@@ -195,13 +243,45 @@ class _QuizTemplateState extends State<QuizTemplate> {
                   label: const Text('Edit'),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
                 ),
+
+                // delete button
                 ElevatedButton.icon(
-                  onPressed: () {
-                    _showDeleteConfirmation(context, widget.quizId);
-                  },
-                  icon: const Icon(Icons.delete),
+                  onPressed: _isDeleting
+                      ? null
+                      : () {
+                          _showDeleteConfirmation(context, widget.quizId);
+                        },
+                  icon: _isDeleting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.delete),
                   label: const Text('Delete'),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                ),
+
+                // play quiz
+                ElevatedButton.icon(
+                  onPressed: _isLoading ? null : () => _playQuiz(context),
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.play_arrow),
+                  label: Text('Play'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
                 ),
               ],
             ),
@@ -209,6 +289,38 @@ class _QuizTemplateState extends State<QuizTemplate> {
         ),
       ),
     );
+  }
+
+  /// Play the quiz by loading it and navigating to quiz_generator
+  Future<void> _playQuiz(BuildContext context) async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Convert Firestore document to QuizModel
+      final data = widget.quizDoc.data() as Map<String, dynamic>;
+      final quiz = QuizModel.fromMap(data, widget.quizId);
+
+      if (!mounted) return;
+
+      // Set current quiz and navigate
+      context.read<QuizProvider>().setCurrentQuiz(quiz);
+      Navigator.pushNamed(context, 'quiz_generator');
+    } catch (e) {
+      print('Error loading quiz for play: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading quiz: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   /// Show delete confirmation dialog
@@ -228,7 +340,7 @@ class _QuizTemplateState extends State<QuizTemplate> {
             ),
             TextButton(
               onPressed: () {
-                _deleteQuiz(quizId, context);
+                _deleteQuiz(quizId);
                 Navigator.pop(context);
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -240,21 +352,63 @@ class _QuizTemplateState extends State<QuizTemplate> {
     );
   }
 
-  /// Delete quiz from Firebase
-  Future<void> _deleteQuiz(String quizId, BuildContext context) async {
+  /// Delete quiz from Firebase with proper error handling
+  Future<void> _deleteQuiz(String quizId) async {
+    setState(() => _isDeleting = true);
+
     try {
       await firestore.collection('quizzes').doc(quizId).delete();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Quiz deleted successfully')),
+          const SnackBar(
+            content: Text('Quiz deleted successfully'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
         );
       }
+    } on FirebaseException catch (e) {
+      print('❌ Firebase Error: ${e.code} - ${e.message}');
+      _showErrorSnackBar(_getFirebaseErrorMessage(e.code));
     } catch (e) {
+      print('❌ Unexpected Error: $e');
+      _showErrorSnackBar('An unexpected error occurred');
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error deleting quiz: $e')));
+        setState(() => _isDeleting = false);
       }
+    }
+  }
+
+  /// Show error snackbar
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  /// Get user-friendly error message from Firebase error code
+  String _getFirebaseErrorMessage(String errorCode) {
+    switch (errorCode) {
+      case 'permission-denied':
+        return 'Permission denied. You don\'t have permission to delete this quiz. Check Firestore security rules.';
+      case 'not-found':
+        return 'Quiz not found. It may have already been deleted.';
+      case 'unauthenticated':
+        return 'You are not authenticated. Please log in again.';
+      case 'internal':
+        return 'Internal Firestore error. Try again later.';
+      case 'network-error':
+        return 'Network error. Check your internet connection.';
+      default:
+        return 'Error deleting quiz: $errorCode. Check Firestore security rules.';
     }
   }
 }
