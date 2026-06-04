@@ -18,6 +18,9 @@ class CustomizeQuiz extends StatefulWidget {
 class _CustomizeQuizState extends State<CustomizeQuiz> {
   List<String> questionList = [];
   List<bool?> answerList = [];
+  List<List<String>> multipleChoiceAnswers = [];
+  List<int?> correctMCAnswerIndex = [];
+  List<bool> isMultipleChoiceList = [];
   late TextEditingController quizNameController;
   late TextEditingController quizDescriptionController;
   final List<Widget> _questionWidgets = [];
@@ -47,15 +50,33 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
 
     // Convert questionList and answerList to Question objects
     List<Question> questions = [];
+
     for (int i = 0; i < questionList.length; i++) {
-      if (questionList[i].isNotEmpty && answerList[i] != null) {
-        questions.add(Question(q: questionList[i], a: answerList[i]!));
+      if (questionList[i].isEmpty) continue;
+
+      // For true and false questions
+      if (!isMultipleChoiceList[i]) {
+        if (answerList[i] != null) {
+          questions.add(Question(q: questionList[i], a: answerList[i]!));
+        }
+      }
+      // For multiple choice questions
+      else {
+        if (multipleChoiceAnswers[i].isNotEmpty &&
+            correctMCAnswerIndex[i] != null) {
+          // Store MC data as special question format
+          String mcQuestion =
+              '${questionList[i]}|||${multipleChoiceAnswers[i].join('|||')}|||${correctMCAnswerIndex[i]}';
+          questions.add(
+            Question(q: mcQuestion, a: true),
+          ); // Use 'a' as placeholder
+        }
       }
     }
 
     if (questions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one question')),
+        SnackBar(content: Text('Please add at least one question')),
       );
       return;
     }
@@ -89,6 +110,10 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
       final index = _questionWidgets.length;
       questionList.add('');
       answerList.add(null);
+      multipleChoiceAnswers.add(['', '', '', '']);
+      correctMCAnswerIndex.add(null);
+      isMultipleChoiceList.add(false);
+
       _questionWidgets.add(
         NewQuestionTemplate(
           key: UniqueKey(),
@@ -99,10 +124,20 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
           onAnswerSelected: (isCorrect) {
             answerList[index] = isCorrect;
           },
+          onMultipleChoiceChanged: (answers, correctIndex) {
+            multipleChoiceAnswers[index] = answers;
+            correctMCAnswerIndex[index] = correctIndex;
+          },
+          onTypeChanged: (isMultipleChoice) {
+            isMultipleChoiceList[index] = isMultipleChoice;
+          },
           onDelete: () {
             setState(() {
               questionList.removeAt(index);
               answerList.removeAt(index);
+              multipleChoiceAnswers.removeAt(index);
+              correctMCAnswerIndex.removeAt(index);
+              isMultipleChoiceList.removeAt(index);
               _questionWidgets.removeAt(index);
             });
           },
@@ -166,6 +201,7 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
                 ),
               ),
               ..._questionWidgets,
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -174,19 +210,25 @@ class _CustomizeQuizState extends State<CustomizeQuiz> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextButton(
+              ElevatedButton.icon(
                 onPressed: _addQuestion,
-                style: kButtonStyle,
-                child: Text(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[800],
+                ),
+                icon: Icon(Icons.add),
+                label: Text(
                   'Add Question',
                   style: TextStyle(color: Colors.grey[700], fontSize: 15),
                 ),
               ),
-              const SizedBox(width: 40),
-              TextButton(
-                style: kButtonStyle,
+              const SizedBox(width: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[800],
+                ),
                 onPressed: saveQuiz,
-                child: const Text(
+                icon: Icon(Icons.save),
+                label: const Text(
                   'Save',
                   style: TextStyle(color: Colors.black, fontSize: 20),
                 ),
@@ -203,6 +245,8 @@ class NewQuestionTemplate extends StatefulWidget {
   final int questionNumber;
   final Function(String) onQuestionChanged;
   final Function(bool) onAnswerSelected;
+  final Function(List<String>, int?) onMultipleChoiceChanged;
+  final Function(bool) onTypeChanged;
   final VoidCallback onDelete;
 
   const NewQuestionTemplate({
@@ -210,6 +254,8 @@ class NewQuestionTemplate extends StatefulWidget {
     required this.questionNumber,
     required this.onQuestionChanged,
     required this.onAnswerSelected,
+    required this.onMultipleChoiceChanged,
+    required this.onTypeChanged,
     required this.onDelete,
   });
 
@@ -220,6 +266,8 @@ class NewQuestionTemplate extends StatefulWidget {
 class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
   bool? selectedAnswer;
   bool isMultipleChoice = false;
+  List<String> mcAnswers = ['', '', '', ''];
+  int? correctMCIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -229,147 +277,240 @@ class _NewQuestionTemplateState extends State<NewQuestionTemplate> {
         color: Colors.blue,
         width: double.infinity,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Question type toggle
             Padding(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10.0),
               child: Row(
                 children: [
-                  Checkbox(
-                    value: isMultipleChoice,
-                    onChanged: (value) {
-                      setState(() {
-                        isMultipleChoice = value ?? false;
-                      });
-                    },
+                  Expanded(
+                    child: Text(
+                      'Question ${widget.questionNumber}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
-                  Text('Multiple choice Question'),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red, size: 24),
+                    onPressed: widget.onDelete,
+                  ),
                 ],
               ),
             ),
-            if (isMultipleChoice == false)
-              Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete,
-                        color: Colors.red,
-                        size: 30,
+
+            // Question type selector
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: !isMultipleChoice
+                          ? null
+                          : () {
+                              setState(() => isMultipleChoice = false);
+                              widget.onTypeChanged(false);
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: !isMultipleChoice
+                            ? Colors.green
+                            : Colors.grey[400],
                       ),
-                      onPressed: widget.onDelete,
+                      child: const Text('True/False'),
                     ),
-                    const SizedBox(width: 20),
-                    Text(
-                      'Question ${widget.questionNumber}',
-                      style: const TextStyle(fontSize: 15),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: isMultipleChoice
+                          ? null
+                          : () {
+                              setState(() => isMultipleChoice = true);
+                              widget.onTypeChanged(true);
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isMultipleChoice
+                            ? Colors.orange
+                            : Colors.grey[400],
+                      ),
+                      child: const Text('Multiple Choice'),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 15),
+
+            // Question text input
             Padding(
               padding: const EdgeInsets.all(15),
               child: TextField(
                 decoration: const InputDecoration(
                   icon: Icon(Icons.question_mark),
-                  hintText: 'Question',
+                  hintText: 'Enter your question',
                   hintStyle: TextStyle(color: Colors.grey),
                   border: OutlineInputBorder(),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 style: const TextStyle(
                   color: Colors.black,
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
                 onChanged: widget.onQuestionChanged,
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.all(15),
-              child: Text(
-                'Answer',
-                style: TextStyle(color: Colors.grey, fontSize: 20),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: ReusableCard(
-                      onPress: () {
-                        setState(() => selectedAnswer = true);
-                        widget.onAnswerSelected(true);
-                      },
-                      colour: selectedAnswer == true
-                          ? kTrueActiveCardColor
-                          : kTrueInactiveCardColor,
-                      cardChild: const Icon(Icons.check),
-                    ),
+
+            // True/False answers
+            if (!isMultipleChoice) ...[
+              const Padding(
+                padding: EdgeInsets.all(15),
+                child: Text(
+                  'Correct Answer',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: ReusableCard(
-                      onPress: () {
-                        setState(() => selectedAnswer = false);
-                        widget.onAnswerSelected(false);
-                      },
-                      colour: selectedAnswer == false
-                          ? kFalseActiveCardColor
-                          : kFalseInactiveCardColor,
-                      cardChild: const Icon(Icons.close),
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => selectedAnswer = true);
+                          widget.onAnswerSelected(true);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedAnswer == true
+                              ? Colors.green[600]
+                              : Colors.green[200],
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.all(15),
+                          child: Text(
+                            'True',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => selectedAnswer = false);
+                          widget.onAnswerSelected(false);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: selectedAnswer == false
+                              ? Colors.red[600]
+                              : Colors.red[200],
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.all(15),
+                          child: Text(
+                            'False',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Multiple choice answers
+            if (isMultipleChoice) ...[
+              const Padding(
+                padding: EdgeInsets.all(15),
+                child: Text(
+                  'Answer Options',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  children: List.generate(4, (index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              decoration: InputDecoration(
+                                hintText:
+                                    'Option ${String.fromCharCode(65 + index)}',
+                                hintStyle: const TextStyle(color: Colors.grey),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                              ),
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                              ),
+                              onChanged: (value) {
+                                mcAnswers[index] = value;
+                                widget.onMultipleChoiceChanged(
+                                  mcAnswers,
+                                  correctMCIndex,
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() => correctMCIndex = index);
+                              widget.onMultipleChoiceChanged(mcAnswers, index);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: correctMCIndex == index
+                                  ? Colors.green
+                                  : Colors.grey[400],
+                            ),
+                            child: const Text(
+                              '✓',
+                              style: TextStyle(fontSize: 20),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
-            if (isMultipleChoice == true)
-              Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white70,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white70,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white70,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white70,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),

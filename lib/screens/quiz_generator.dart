@@ -8,6 +8,58 @@ import 'package:quizler/question_info.dart';
 double numberOfCorrectAnswers = 0;
 double numberOfIncorrectAnswers = 0;
 
+/// Helper class to detect and parse multiple choice questions
+class MCQuestionHelper {
+  /// Check if question is multiple choice (encoded with |||)
+  static bool isMultipleChoice(String questionText) {
+    return questionText.contains('|||');
+  }
+
+  /// Parse multiple choice question
+  /// Format: "question text|||option1|||option2|||option3|||option4|||correctIndex"
+  static MCQuestion? parseMultipleChoice(String questionText) {
+    try {
+      final parts = questionText.split('|||');
+      if (parts.length != 6) return null;
+
+      final question = parts[0];
+      final options = [parts[1], parts[2], parts[3], parts[4]];
+      final correctIndex = int.parse(parts[5]);
+
+      return MCQuestion(
+        question: question,
+        options: options,
+        correctIndex: correctIndex,
+      );
+    } catch (e) {
+      print('Error parsing MC question: $e');
+      return null;
+    }
+  }
+
+  /// Check if answer is correct
+  static bool isAnswerCorrect(String questionText, int selectedIndex) {
+    final mc = parseMultipleChoice(questionText);
+    if (mc == null) return false;
+    return selectedIndex == mc.correctIndex;
+  }
+}
+
+/// Multiple Choice Question data class
+class MCQuestion {
+  final String question;
+  final List<String> options;
+  final int correctIndex;
+
+  MCQuestion({
+    required this.question,
+    required this.options,
+    required this.correctIndex,
+  });
+
+  String getCorrectAnswer() => options[correctIndex];
+}
+
 class QuizPageGenerator extends StatefulWidget {
   const QuizPageGenerator({super.key});
 
@@ -20,6 +72,7 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
   late List<Question> shuffledQuestions;
   List<Icon> scoreKeeper = [];
   bool _isAnswered = false;
+  int? _selectedMCIndex; // Track selected MC option
 
   @override
   void initState() {
@@ -33,7 +86,6 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
     final currentQuiz = quizProvider.currentQuiz;
 
     if (currentQuiz == null) {
-      // Navigate back if no quiz selected
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushNamed(context, 'home_page');
         ScaffoldMessenger.of(
@@ -43,7 +95,7 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
       return;
     }
 
-    // create a copy of the questions and shuffle them
+    // Create a copy of questions and shuffle them
     shuffledQuestions = List.from(currentQuiz.questionBank);
     shuffledQuestions.shuffle();
 
@@ -51,9 +103,9 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
     questionInfo = QuestionInfo(initialQuizLength: shuffledQuestions.length);
   }
 
-  /// Check user's answer against correct answer
-  void checkAnswer(bool userPickedAnswer) {
-    if (_isAnswered) return; // Prevent multiple answers for same question
+  /// Check True/False answer
+  void _checkTrueFalseAnswer(bool userPickedAnswer) {
+    if (_isAnswered) return;
 
     final quizProvider = context.read<QuizProvider>();
     final currentQuiz = quizProvider.currentQuiz;
@@ -62,41 +114,148 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
       return;
     }
 
-    // Get correct answer for current question
     final correctAnswer = questionInfo.getQuestionAnswer(shuffledQuestions);
 
     setState(() {
-      _isAnswered = true; // Disable further answers
+      _isAnswered = true;
 
       if (userPickedAnswer == correctAnswer) {
         numberOfCorrectAnswers++;
-        scoreKeeper.add(const Icon(Icons.check, color: Colors.green));
+        scoreKeeper.add(const Icon(Icons.check, color: Colors.green, size: 30));
       } else {
         numberOfIncorrectAnswers++;
-        scoreKeeper.add(const Icon(Icons.close, color: Colors.red));
+        scoreKeeper.add(const Icon(Icons.close, color: Colors.red, size: 30));
       }
 
-      // Small delay before moving to next question
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) {
-          setState(() {
-            if (questionInfo.isFinished()) {
-              // Quiz completed - navigate to results
-              Navigator.pushNamed(context, 'quiz_end');
-              scoreKeeper = [];
-              questionInfo.resetQuestion();
-            } else {
-              // Move to next question
-              questionInfo.nextQuestion();
-              _isAnswered = false;
-            }
-          });
+          _moveToNextQuestion();
         }
       });
     });
   }
 
-  /// Build answer button with consistent styling
+  /// Check Multiple Choice answer
+  void _checkMultipleChoiceAnswer(int selectedIndex) {
+    if (_isAnswered) return;
+
+    final question = questionInfo.getCurrentQuestion(shuffledQuestions);
+    if (question == null) return;
+
+    final isCorrect = MCQuestionHelper.isAnswerCorrect(
+      question.q,
+      selectedIndex,
+    );
+
+    setState(() {
+      _isAnswered = true;
+      _selectedMCIndex = selectedIndex;
+
+      if (isCorrect) {
+        numberOfCorrectAnswers++;
+        scoreKeeper.add(const Icon(Icons.check, color: Colors.green, size: 30));
+      } else {
+        numberOfIncorrectAnswers++;
+        scoreKeeper.add(const Icon(Icons.close, color: Colors.red, size: 30));
+      }
+
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          _moveToNextQuestion();
+        }
+      });
+    });
+  }
+
+  /// Move to next question or finish quiz
+  void _moveToNextQuestion() {
+    if (mounted) {
+      setState(() {
+        if (questionInfo.isFinished()) {
+          Navigator.pushNamed(context, 'quiz_end');
+          scoreKeeper = [];
+          questionInfo.resetQuestion();
+        } else {
+          questionInfo.nextQuestion();
+          _isAnswered = false;
+          _selectedMCIndex = null;
+        }
+      });
+    }
+  }
+
+  /// Build True/False answer buttons
+  Widget _buildTrueFalseSection() {
+    return Column(
+      children: [
+        _buildAnswerButton(
+          label: 'True',
+          color: Colors.green,
+          answered: _isAnswered,
+          isCorrect: true,
+          onPressed: () => _checkTrueFalseAnswer(true),
+        ),
+        _buildAnswerButton(
+          label: 'False',
+          color: Colors.red,
+          answered: _isAnswered,
+          isCorrect: false,
+          onPressed: () => _checkTrueFalseAnswer(false),
+        ),
+      ],
+    );
+  }
+
+  /// Build Multiple Choice buttons
+  Widget _buildMultipleChoiceSection(MCQuestion mc) {
+    return Column(
+      children: List.generate(mc.options.length, (index) {
+        final option = mc.options[index];
+        final isSelected = _selectedMCIndex == index;
+        final isCorrect = index == mc.correctIndex;
+
+        // Determine color
+        Color buttonColor;
+        if (!_isAnswered) {
+          buttonColor = Colors.blue[800]!;
+        } else if (isSelected) {
+          buttonColor = isCorrect ? Colors.green : Colors.red;
+        } else if (isCorrect) {
+          buttonColor = Colors.green; // Show correct answer
+        } else {
+          buttonColor = Colors.blue[300]!;
+        }
+
+        return Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: _isAnswered
+                  ? null
+                  : () => _checkMultipleChoiceAnswer(index),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: buttonColor,
+                elevation: _isAnswered ? 0 : 5,
+              ),
+              child: Text(
+                '${String.fromCharCode(65 + index)}) $option',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.left,
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  /// Build True/False answer button
   Widget _buildAnswerButton({
     required String label,
     required Color color,
@@ -137,7 +296,6 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
       builder: (context, quizProvider, _) {
         final currentQuiz = quizProvider.currentQuiz;
 
-        // Show error if no quiz selected
         if (currentQuiz == null) {
           return Scaffold(
             appBar: AppBar(
@@ -160,8 +318,25 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
           );
         }
 
-        // Get current question text safely
+        // Get current question
+        final currentQuestion = questionInfo.getCurrentQuestion(
+          shuffledQuestions,
+        );
         final questionText = questionInfo.getQuestionText(shuffledQuestions);
+
+        // Check if this is a multiple choice question
+        final isMultipleChoice =
+            currentQuestion != null &&
+            MCQuestionHelper.isMultipleChoice(currentQuestion.q);
+
+        final mcQuestion = isMultipleChoice
+            ? MCQuestionHelper.parseMultipleChoice(currentQuestion!.q)
+            : null;
+
+        // Get display text (without MC encoding)
+        final displayText = isMultipleChoice && mcQuestion != null
+            ? mcQuestion.question
+            : questionText;
 
         return Scaffold(
           backgroundColor: Colors.blue,
@@ -176,7 +351,6 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
             elevation: 10,
             shadowColor: Colors.black,
             actions: [
-              // Progress indicator in app bar
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -191,9 +365,7 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
                 ),
               ),
               IconButton(
-                onPressed: () {
-                  _confirmExit(context);
-                },
+                onPressed: () => _confirmExit(context),
                 icon: const Icon(Icons.home, color: Colors.white, size: 24),
                 tooltip: 'Exit Quiz',
               ),
@@ -218,15 +390,15 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
 
               // Question display
               Expanded(
-                flex: 5,
+                flex: 4,
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Center(
                     child: Text(
-                      questionText,
+                      displayText,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 25.0,
+                        fontSize: 24.0,
                         color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
@@ -235,25 +407,20 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
                 ),
               ),
 
-              // True button
-              _buildAnswerButton(
-                label: 'True',
-                color: Colors.green,
-                answered: _isAnswered,
-                isCorrect: true,
-                onPressed: () => checkAnswer(true),
+              // Answer options (True/False or Multiple Choice)
+              Expanded(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.all(10.0),
+                  child: SingleChildScrollView(
+                    child: isMultipleChoice && mcQuestion != null
+                        ? _buildMultipleChoiceSection(mcQuestion)
+                        : _buildTrueFalseSection(),
+                  ),
+                ),
               ),
 
-              // False button
-              _buildAnswerButton(
-                label: 'False',
-                color: Colors.red,
-                answered: _isAnswered,
-                isCorrect: false,
-                onPressed: () => checkAnswer(false),
-              ),
-
-              // Score keeper (shows correct/incorrect icons)
+              // Score keeper
               SizedBox(
                 height: 80,
                 child: Padding(
@@ -292,7 +459,7 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
             ),
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(context);
                 _resetQuiz();
                 Navigator.pushNamed(context, 'home_page');
               },

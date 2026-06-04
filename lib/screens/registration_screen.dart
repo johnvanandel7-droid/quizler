@@ -131,8 +131,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             'orderUpdates': true,
             'messages': true,
           },
-          'accountType': 'free_trial', // or 'paid' if registration fee was paid
-          'verified': false,
+          'favoriteQuizes': [],
         });
       }
 

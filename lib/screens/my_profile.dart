@@ -27,41 +27,227 @@ class _MyProfileState extends State<MyProfile> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: const ReusableAppBar(),
-      body: Column(
-        children: [
-          // header User name
-          Padding(
-            padding: EdgeInsets.all(15),
-            child: Text(
-              auth.currentUser?.email!.split('@')[0] ?? 'no_name',
-              style: TextStyle(fontSize: 25),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // header User name
+            Padding(
+              padding: EdgeInsets.all(15),
+              child: Text(
+                auth.currentUser?.email!.split('@')[0] ?? 'no_name',
+                style: TextStyle(fontSize: 25),
+              ),
             ),
-          ),
-          // quizes section header
-          SectionHeader(
-            title: 'My Quizes',
-            isExpanded: showQuizes,
-            onToggle: () {
-              setState(() {
-                showQuizes = !showQuizes;
-              });
-            },
-          ),
-          if (showQuizes == true) const MyQuizesList(),
-          if (showQuizes == false) const SizedBox(),
-          // playing history section
-          SectionHeader(
-            title: 'My Playing History',
-            isExpanded: showPlayingHistory,
-            onToggle: () {
-              setState(() {
-                showPlayingHistory = !showPlayingHistory;
-              });
-            },
-          ),
-          if (showPlayingHistory == true) Text('hi') else const SizedBox(),
-        ],
+            // quizes section header
+            SectionHeader(
+              title: 'My Quizes',
+              isExpanded: showQuizes,
+              onToggle: () {
+                setState(() {
+                  showQuizes = !showQuizes;
+                });
+              },
+            ),
+            if (showQuizes == true) const MyQuizesList(),
+            if (showQuizes == false) const SizedBox(),
+            // playing history section
+            SectionHeader(
+              title: 'My Playing History',
+              isExpanded: showPlayingHistory,
+              onToggle: () {
+                setState(() {
+                  showPlayingHistory = !showPlayingHistory;
+                });
+              },
+            ),
+            if (showPlayingHistory == true) Text('hi') else const SizedBox(),
+            SizedBox(height: 12),
+            Text(
+              'Favorite Quizes',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            FavoriteQuizesList(),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class FavoriteQuizesList extends StatelessWidget {
+  const FavoriteQuizesList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: firestore.collection('users').doc(auth.currentUser!.uid).get(),
+
+      builder: (context, userSnapshot) {
+        // loading
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // error
+        if (userSnapshot.hasError) {
+          return Center(child: Text('Error: ${userSnapshot.error}'));
+        }
+
+        // no user doc
+        if (!userSnapshot.hasData || !userSnapshot.data!.exists) {
+          return const Center(child: Text('User data not found'));
+        }
+
+        final userData = userSnapshot.data!.data() as Map<String, dynamic>;
+
+        // get favorite quiz ids
+        final List<dynamic> favoriteQuizesDynamic =
+            userData['favoriteQuizes'] ?? [];
+
+        final List<String> favoriteQuizes = favoriteQuizesDynamic
+            .cast<String>();
+
+        // empty favorites
+        if (favoriteQuizes.isEmpty) {
+          return const Center(child: Text('No favorite quizzes yet'));
+        }
+
+        return FutureBuilder<QuerySnapshot>(
+          future: firestore
+              .collection('quizzes')
+              .where(FieldPath.documentId, whereIn: favoriteQuizes)
+              .get(),
+
+          builder: (context, quizSnapshot) {
+            // loading
+            if (quizSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            // error
+            if (quizSnapshot.hasError) {
+              return Center(child: Text('Error: ${quizSnapshot.error}'));
+            }
+
+            if (!quizSnapshot.hasData || quizSnapshot.data!.docs.isEmpty) {
+              return const Center(child: Text('No quizzes found'));
+            }
+
+            final docs = quizSnapshot.data!.docs;
+
+            return Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(10),
+                itemCount: docs.length,
+
+                itemBuilder: (context, index) {
+                  try {
+                    final doc = docs[index];
+
+                    final data = doc.data() as Map<String, dynamic>;
+
+                    final plays = (data['plays'] as int?) ?? 0;
+
+                    final quizName =
+                        (data['name'] as String?) ?? 'Unnamed Quiz';
+
+                    final createdAt =
+                        (data['createdAt'] as Timestamp?) ?? Timestamp.now();
+
+                    return QuizTemplate(
+                      plays: plays,
+                      quizName: quizName,
+                      createdAt: createdAt,
+                      quizId: doc.id,
+                      quizDoc: doc,
+                    );
+                  } catch (e) {
+                    print(e);
+
+                    return const SizedBox.shrink();
+                  }
+                },
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class MyPlayingHistoryList extends StatelessWidget {
+  const MyPlayingHistoryList({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: firestore
+          .collection('scores')
+          .where('userId', isEqualTo: auth.currentUser!.uid)
+          .orderBy('timestamp', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        // loading state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // error state
+        if (snapshot.hasError) {
+          print(snapshot.error);
+          return Center(
+            child: Text(
+              "Error: ${snapshot.error}",
+              style: TextStyle(color: Colors.red),
+            ),
+          );
+        }
+
+        // empty state
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Text("No scores yet"),
+            ),
+          );
+        }
+
+        final docs = snapshot.data!.docs;
+
+        return Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(10),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              try {
+                final doc = docs[index];
+                final data = doc.data() as Map<String, dynamic>;
+
+                // Safely parse data with defaults
+                final percentage = data['score'] as double;
+                final quizName =
+                    (data['quizName'] as String?) ?? 'Unnamed Quiz';
+                final timestamp =
+                    (data['timestamp'] as Timestamp?) ?? Timestamp.now();
+                final quizId = doc.id;
+
+                return ScoreTemplate(
+                  quizName: quizName,
+                  timeStamp: timestamp,
+                  quizId: quizId,
+                  scorePercentage:
+                      percentage, // Pass doc for Play Quiz functionality
+                );
+              } catch (e) {
+                print('Error parsing quiz: $e');
+                return const SizedBox.shrink();
+              }
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -85,6 +271,7 @@ class MyQuizesList extends StatelessWidget {
 
         // error state
         if (snapshot.hasError) {
+          print(snapshot.error);
           return Center(
             child: Text(
               "Error: ${snapshot.error}",
@@ -136,6 +323,115 @@ class MyQuizesList extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class ScoreTemplate extends StatefulWidget {
+  final String quizName;
+  final Timestamp timeStamp;
+  final double scorePercentage;
+  final String quizId;
+
+  const ScoreTemplate({
+    super.key,
+    required this.quizId,
+    required this.quizName,
+    required this.scorePercentage,
+    required this.timeStamp,
+  });
+
+  @override
+  State<ScoreTemplate> createState() => _ScoreTemplateState();
+}
+
+class _ScoreTemplateState extends State<ScoreTemplate> {
+  bool _isLoading = false;
+
+  Future<void> _playQuiz(BuildContext context) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final doc = await firestore
+          .collection('quizzes')
+          .doc(widget.quizId)
+          .get();
+
+      if (!doc.exists) {
+        throw Exception('Quiz no longer exists');
+      }
+
+      final data = doc.data()!;
+      final quiz = QuizModel.fromMap(data, doc.id);
+
+      if (!mounted) return;
+
+      context.read<QuizProvider>().setCurrentQuiz(quiz);
+
+      Navigator.pushNamed(context, 'quiz_generator');
+    } catch (e) {
+      print('Error loading quiz: $e');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error loading quiz'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.quizName,
+                  style: const TextStyle(fontSize: 20),
+                ),
+              ),
+              Text(
+                formatTimeAgo(widget.timeStamp),
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Text(
+            'Your Score: ${widget.scorePercentage}%',
+            style: const TextStyle(fontSize: 20),
+          ),
+
+          const SizedBox(height: 15),
+
+          ElevatedButton(
+            onPressed: _isLoading ? null : () => _playQuiz(context),
+            child: _isLoading
+                ? const CircularProgressIndicator()
+                : const Text('Play Quiz'),
+          ),
+        ],
+      ),
     );
   }
 }
