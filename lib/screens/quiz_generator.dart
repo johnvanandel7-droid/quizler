@@ -265,9 +265,11 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
   }) {
     final isSelected = answered && (label == 'True' ? isCorrect : !isCorrect);
 
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.all(15.0),
+    return Padding(
+      padding: const EdgeInsets.all(15.0),
+      child: SizedBox(
+        width: double.infinity,
+        height: 70,
         child: TextButton(
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.all(
@@ -412,11 +414,9 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
                 flex: 3,
                 child: Padding(
                   padding: const EdgeInsets.all(10.0),
-                  child: SingleChildScrollView(
-                    child: isMultipleChoice && mcQuestion != null
-                        ? _buildMultipleChoiceSection(mcQuestion)
-                        : _buildTrueFalseSection(),
-                  ),
+                  child: isMultipleChoice && mcQuestion != null
+                      ? _buildMultipleChoiceSection(mcQuestion)
+                      : _buildTrueFalseSection(),
                 ),
               ),
 

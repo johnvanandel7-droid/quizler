@@ -1,7 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quizler/models/questions.dart';
 import 'package:quizler/services/firebase_service.dart';
 import 'package:quizler/models/quiz_model.dart';
+
+final firestore = FirebaseFirestore.instance;
 
 class QuizProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService();
@@ -220,5 +223,28 @@ class QuizProvider extends ChangeNotifier {
     if (_quizzes.isEmpty) return 0;
     final sum = _quizzes.fold<int>(0, (sum, quiz) => sum + quiz.difficulty);
     return sum / _quizzes.length;
+  }
+
+  Future<List<QuizModel>> showFavoriteQuizzes(String userId) async {
+    try {
+      final userDoc = await firestore.collection('users').doc(userId).get();
+
+      if (!userDoc.exists) return [];
+
+      final favoriteIds = List<String>.from(
+        userDoc.data()?['favoriteQuizes'] ?? [],
+      );
+
+      if (favoriteIds.isEmpty) return [];
+
+      // fetch each quiz by ID using your existing method
+      final quizFeatures = favoriteIds.map((id) => getQuizById(id));
+      final results = await Future.wait(quizFeatures);
+
+      // filter out any nulls like deleted quizes
+      return results.whereType<QuizModel>().toList();
+    } catch (e) {
+      return [];
+    }
   }
 }

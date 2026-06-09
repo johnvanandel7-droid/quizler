@@ -60,7 +60,10 @@ class _MyProfileState extends State<MyProfile> {
                 });
               },
             ),
-            if (showPlayingHistory == true) Text('hi') else const SizedBox(),
+            if (showPlayingHistory == true)
+              const MyPlayingHistoryList()
+            else
+              const SizedBox(),
             SizedBox(height: 12),
             Text(
               'Favorite Quizes',
@@ -79,8 +82,12 @@ class FavoriteQuizesList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<DocumentSnapshot>(
-      future: firestore.collection('users').doc(auth.currentUser!.uid).get(),
+    // Use StreamBuilder so favorites update in real time
+    return StreamBuilder<DocumentSnapshot>(
+      stream: firestore
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .snapshots(),
 
       builder: (context, userSnapshot) {
         // loading
@@ -100,22 +107,25 @@ class FavoriteQuizesList extends StatelessWidget {
 
         final userData = userSnapshot.data!.data() as Map<String, dynamic>;
 
-        // get favorite quiz ids
-        final List<dynamic> favoriteQuizesDynamic =
-            userData['favoriteQuizes'] ?? [];
+        // FIX: check both field name spellings for backwards compatibility
+        final List<dynamic> favoriteQuizzesDynamic =
+            userData['favoriteQuizzes'] ?? userData['favoriteQuizes'] ?? [];
 
-        final List<String> favoriteQuizes = favoriteQuizesDynamic
+        final List<String> favoriteQuizzes = favoriteQuizzesDynamic
             .cast<String>();
 
         // empty favorites
-        if (favoriteQuizes.isEmpty) {
-          return const Center(child: Text('No favorite quizzes yet'));
+        if (favoriteQuizzes.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(20),
+            child: Center(child: Text('No favorite quizzes yet')),
+          );
         }
 
         return FutureBuilder<QuerySnapshot>(
           future: firestore
               .collection('quizzes')
-              .where(FieldPath.documentId, whereIn: favoriteQuizes)
+              .where(FieldPath.documentId, whereIn: favoriteQuizzes)
               .get(),
 
           builder: (context, quizSnapshot) {
@@ -130,44 +140,42 @@ class FavoriteQuizesList extends StatelessWidget {
             }
 
             if (!quizSnapshot.hasData || quizSnapshot.data!.docs.isEmpty) {
-              return const Center(child: Text('No quizzes found'));
+              return const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: Text('No quizzes found')),
+              );
             }
 
             final docs = quizSnapshot.data!.docs;
 
-            return Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(10),
-                itemCount: docs.length,
+            // FIX: use shrinkWrap instead of Expanded — Expanded crashes inside
+            // SingleChildScrollView > Column
+            return ListView.builder(
+              padding: const EdgeInsets.all(10),
+              itemCount: docs.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemBuilder: (context, index) {
+                try {
+                  final doc = docs[index];
+                  final data = doc.data() as Map<String, dynamic>;
+                  final plays = (data['plays'] as int?) ?? 0;
+                  final quizName = (data['name'] as String?) ?? 'Unnamed Quiz';
+                  final createdAt =
+                      (data['createdAt'] as Timestamp?) ?? Timestamp.now();
 
-                itemBuilder: (context, index) {
-                  try {
-                    final doc = docs[index];
-
-                    final data = doc.data() as Map<String, dynamic>;
-
-                    final plays = (data['plays'] as int?) ?? 0;
-
-                    final quizName =
-                        (data['name'] as String?) ?? 'Unnamed Quiz';
-
-                    final createdAt =
-                        (data['createdAt'] as Timestamp?) ?? Timestamp.now();
-
-                    return QuizTemplate(
-                      plays: plays,
-                      quizName: quizName,
-                      createdAt: createdAt,
-                      quizId: doc.id,
-                      quizDoc: doc,
-                    );
-                  } catch (e) {
-                    print(e);
-
-                    return const SizedBox.shrink();
-                  }
-                },
-              ),
+                  return QuizTemplate(
+                    plays: plays,
+                    quizName: quizName,
+                    createdAt: createdAt,
+                    quizId: doc.id,
+                    quizDoc: doc,
+                  );
+                } catch (e) {
+                  print(e);
+                  return const SizedBox.shrink();
+                }
+              },
             );
           },
         );
@@ -216,36 +224,38 @@ class MyPlayingHistoryList extends StatelessWidget {
 
         final docs = snapshot.data!.docs;
 
-        return Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(10),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              try {
-                final doc = docs[index];
-                final data = doc.data() as Map<String, dynamic>;
+        // FIX: shrinkWrap instead of Expanded (Expanded crashes in SingleChildScrollView)
+        return ListView.builder(
+          padding: const EdgeInsets.all(10),
+          itemCount: docs.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            try {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
 
-                // Safely parse data with defaults
-                final percentage = data['score'] as double;
-                final quizName =
-                    (data['quizName'] as String?) ?? 'Unnamed Quiz';
-                final timestamp =
-                    (data['timestamp'] as Timestamp?) ?? Timestamp.now();
-                final quizId = doc.id;
+              // FIX: score was saved as String, parse it safely
+              final rawScore = data['score'];
+              final percentage = rawScore is double
+                  ? rawScore
+                  : double.tryParse(rawScore.toString()) ?? 0.0;
+              final quizName = (data['quizName'] as String?) ?? 'Unnamed Quiz';
+              final timestamp =
+                  (data['timestamp'] as Timestamp?) ?? Timestamp.now();
+              final quizId = doc.id;
 
-                return ScoreTemplate(
-                  quizName: quizName,
-                  timeStamp: timestamp,
-                  quizId: quizId,
-                  scorePercentage:
-                      percentage, // Pass doc for Play Quiz functionality
-                );
-              } catch (e) {
-                print('Error parsing quiz: $e');
-                return const SizedBox.shrink();
-              }
-            },
-          ),
+              return ScoreTemplate(
+                quizName: quizName,
+                timeStamp: timestamp,
+                quizId: quizId,
+                scorePercentage: percentage,
+              );
+            } catch (e) {
+              print('Error parsing quiz: $e');
+              return const SizedBox.shrink();
+            }
+          },
         );
       },
     );
@@ -292,35 +302,35 @@ class MyQuizesList extends StatelessWidget {
 
         final docs = snapshot.data!.docs;
 
-        return Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(10),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              try {
-                final doc = docs[index];
-                final data = doc.data() as Map<String, dynamic>;
+        return ListView.builder(
+          padding: const EdgeInsets.all(10),
+          itemCount: docs.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            try {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
 
-                // Safely parse data with defaults
-                final plays = (data['plays'] as int?) ?? 0;
-                final quizName = (data['name'] as String?) ?? 'Unnamed Quiz';
-                final createdAt =
-                    (data['createdAt'] as Timestamp?) ?? Timestamp.now();
-                final quizId = doc.id;
+              // Safely parse data with defaults
+              final plays = (data['plays'] as int?) ?? 0;
+              final quizName = (data['name'] as String?) ?? 'Unnamed Quiz';
+              final createdAt =
+                  (data['createdAt'] as Timestamp?) ?? Timestamp.now();
+              final quizId = doc.id;
 
-                return QuizTemplate(
-                  plays: plays,
-                  quizName: quizName,
-                  createdAt: createdAt,
-                  quizId: quizId,
-                  quizDoc: doc, // Pass doc for Play Quiz functionality
-                );
-              } catch (e) {
-                print('Error parsing quiz: $e');
-                return const SizedBox.shrink();
-              }
-            },
-          ),
+              return QuizTemplate(
+                plays: plays,
+                quizName: quizName,
+                createdAt: createdAt,
+                quizId: quizId,
+                quizDoc: doc, // Pass doc for Play Quiz functionality
+              );
+            } catch (e) {
+              print('Error parsing quiz: $e');
+              return const SizedBox.shrink();
+            }
+          },
         );
       },
     );

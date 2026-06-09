@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quizler/components/app_bar.dart';
@@ -5,6 +6,8 @@ import 'package:quizler/quiz_provider.dart';
 import 'package:quizler/screens/customize_quiz.dart';
 import 'package:quizler/screens/settings_page.dart';
 import 'package:quizler/constants.dart';
+
+final auth = FirebaseAuth.instance;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,25 +20,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Refresh quizzes when page loads
+    // Refresh quizzes when page loads only (not on every dependency change)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<QuizProvider>().refreshQuizzes();
-    });
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Refresh when returning to this page after navigation
-    _refreshQuizzes();
-  }
-
-  /// Refresh quizzes when returning from other screens
-  void _refreshQuizzes() {
-    Future.microtask(() {
-      if (mounted) {
-        context.read<QuizProvider>().refreshQuizzes();
-      }
     });
   }
 
@@ -45,8 +32,7 @@ class _HomePageState extends State<HomePage> {
       builder: (context, quizProvider, _) {
         return WillPopScope(
           onWillPop: () async {
-            // refresh when back button is pressed
-            _refreshQuizzes();
+            quizProvider.refreshQuizzes();
             return true;
           },
           child: Scaffold(
@@ -74,9 +60,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                           IconButton(
-                            onPressed: () {
-                              quizProvider.clearError();
-                            },
+                            onPressed: () => quizProvider.clearError(),
                             icon: const Icon(Icons.close, color: Colors.red),
                           ),
                         ],
@@ -85,16 +69,29 @@ class _HomePageState extends State<HomePage> {
                   // Search bar
                   Padding(
                     padding: const EdgeInsets.all(15),
-                    child: TextField(
-                      decoration: kTextFieldDecoration,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onChanged: (value) {
-                        quizProvider.searchQuizzes(value);
-                      },
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            decoration: kTextFieldDecoration,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            onChanged: (value) {
+                              quizProvider.searchQuizzes(value);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Sort/filter menu button
+                        IconButton(
+                          onPressed: () => _showSearchOptions(context),
+                          icon: const Icon(Icons.tune, size: 24),
+                          tooltip: 'Sort & Filter',
+                        ),
+                      ],
                     ),
                   ),
                   // Title
@@ -116,7 +113,6 @@ class _HomePageState extends State<HomePage> {
                     const Expanded(
                       child: Center(child: CircularProgressIndicator()),
                     ),
-                  // Quiz list
                   // Quiz list
                   if (!quizProvider.isLoading)
                     Expanded(
@@ -178,28 +174,30 @@ class NavigationDrawer extends StatelessWidget {
           children: [
             DrawerHeader(
               decoration: BoxDecoration(color: Colors.blueGrey[400]),
-              child: Text(
+              child: const Text(
                 'Menu',
                 style: TextStyle(color: kTextColor, fontSize: 30),
               ),
             ),
             ListTile(
-              leading: Icon(Icons.settings, color: kTextColor),
-              title: Text('Make your own quiz'),
+              leading: const Icon(Icons.add_circle_outline, color: kTextColor),
+              title: const Text('Make your own quiz'),
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => CustomizeQuiz()),
+                  MaterialPageRoute(
+                    builder: (context) => const CustomizeQuiz(),
+                  ),
                 );
               },
             ),
             ListTile(
               leading: const Icon(Icons.settings, color: kTextColor),
-              title: const Text('Settings Page'),
+              title: const Text('Settings'),
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => SettingsPage()),
+                  MaterialPageRoute(builder: (context) => const SettingsPage()),
                 );
               },
             ),
@@ -251,7 +249,7 @@ class AddQuizButton extends StatelessWidget {
               const SizedBox(height: 5),
               Text(
                 description,
-                style: TextStyle(color: Colors.grey, fontSize: 14),
+                style: const TextStyle(color: Colors.grey, fontSize: 14),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -261,4 +259,52 @@ class AddQuizButton extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showSearchOptions(BuildContext context) {
+  showDialog(
+    context: context,
+    builder: (BuildContext dialogContext) {
+      return AlertDialog(
+        title: const Text('Sort & Filter'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.sort_by_alpha),
+              title: const Text('Sort by Name'),
+              onTap: () {
+                context.read<QuizProvider>().sortByName();
+                Navigator.pop(dialogContext);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.signal_cellular_alt),
+              title: const Text('Sort by Difficulty'),
+              onTap: () {
+                context.read<QuizProvider>().sortByDifficulty();
+                Navigator.pop(dialogContext);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.calendar_today),
+              title: const Text('Sort by Newest'),
+              onTap: () {
+                context.read<QuizProvider>().sortByDate();
+                Navigator.pop(dialogContext);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh),
+              title: const Text('Reset / Show All'),
+              onTap: () {
+                context.read<QuizProvider>().refreshQuizzes();
+                Navigator.pop(dialogContext);
+              },
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }

@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quizler/quiz_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:quizler/screens/my_profile.dart';
 import 'package:quizler/screens/quiz_generator.dart';
 
 final auth = FirebaseAuth.instance;
+final firestore = FirebaseFirestore.instance;
 
 class QuizEnd extends StatefulWidget {
   const QuizEnd({super.key});
@@ -20,12 +22,40 @@ class _QuizEndState extends State<QuizEnd> {
   late int correctAnswers;
   late int incorrectAnswers;
   bool _isSavingScore = false;
+  bool _isFavorited = false;
+  bool _isTogglingFavorite = false;
 
   @override
   void initState() {
     super.initState();
     _calculateScores();
     _saveScoreToFirebase();
+    _checkIfFavorited();
+  }
+
+  Future<void> _checkIfFavorited() async {
+    if (auth.currentUser == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(auth.currentUser!.uid)
+          .get();
+
+      if (doc.exists && mounted) {
+        final favorites = List<String>.from(
+          doc.data()?['favoriteQuizzes'] ?? [],
+        );
+        final currentQuiz = context.read<QuizProvider>().currentQuiz;
+
+        setState(() {
+          _isFavorited =
+              currentQuiz != null && favorites.contains(currentQuiz.id);
+        });
+      }
+    } catch (e) {
+      print('Error checking favorites: $e');
+    }
   }
 
   void _calculateScores() {
@@ -47,11 +77,11 @@ class _QuizEndState extends State<QuizEnd> {
     setState(() => _isSavingScore = true);
 
     try {
-      await FirebaseFirestore.instance.collection('scores').add({
+      await firestore.collection('scores').add({
         'quizId': currentQuiz.id,
         'quizName': currentQuiz.name,
         'userId': auth.currentUser?.uid ?? '!!',
-        'score': quizPercentage.toStringAsFixed(1),
+        'score': double.parse(quizPercentage.toStringAsFixed(1)),
         'correctAnswers': correctAnswers,
         'totalQuestions': numberOfQuestions.toInt(),
         'timestamp': FieldValue.serverTimestamp(),
@@ -246,9 +276,93 @@ class _QuizEndState extends State<QuizEnd> {
                       ),
                     ),
 
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 20),
 
                     // Action Buttons
+
+                    // favorite button
+                    Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: ElevatedButton.icon(
+                        onPressed: _isTogglingFavorite
+                            ? null // disable while loading
+                            : () async {
+                                final currentQuiz = quizProvider.currentQuiz;
+                                if (currentQuiz == null ||
+                                    auth.currentUser == null)
+                                  return;
+
+                                setState(() => _isTogglingFavorite = true);
+
+                                try {
+                                  await FirebaseFirestore.instance
+                                      .collection('users')
+                                      .doc(auth.currentUser!.uid)
+                                      .update({
+                                        'favoriteQuizzes': _isFavorited
+                                            ? FieldValue.arrayRemove([
+                                                currentQuiz.id,
+                                              ])
+                                            : FieldValue.arrayUnion([
+                                                currentQuiz.id,
+                                              ]),
+                                      });
+
+                                  if (mounted) {
+                                    setState(
+                                      () => _isFavorited = !_isFavorited,
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          _isFavorited
+                                              ? 'Added to favorites!'
+                                              : 'Removed from favorites!',
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to update favorites: $e',
+                                        ),
+                                        duration: const Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted)
+                                    setState(() => _isTogglingFavorite = false);
+                                }
+                              },
+                        icon: _isTogglingFavorite
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Icon(
+                                _isFavorited
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                              ),
+                        label: Text(
+                          _isFavorited ? 'Unfavorite' : 'Add to favorites',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isFavorited
+                              ? Colors.red
+                              : Colors.blue,
+                        ),
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
