@@ -392,7 +392,7 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
 
               // Question display
               Expanded(
-                flex: 4,
+                flex: 3,
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Center(

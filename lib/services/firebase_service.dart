@@ -80,6 +80,7 @@ class FirebaseService {
         'createdBy': userId,
         'createdAt': FieldValue.serverTimestamp(),
         'difficulty': difficulty,
+        'plays': 0,
       });
       return docRef.id;
     } catch (e) {

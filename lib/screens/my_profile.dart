@@ -159,13 +159,11 @@ class FavoriteQuizesList extends StatelessWidget {
                 try {
                   final doc = docs[index];
                   final data = doc.data() as Map<String, dynamic>;
-                  final plays = (data['plays'] as int?) ?? 0;
                   final quizName = (data['name'] as String?) ?? 'Unnamed Quiz';
                   final createdAt =
                       (data['createdAt'] as Timestamp?) ?? Timestamp.now();
 
-                  return QuizTemplate(
-                    plays: plays,
+                  return FavoriteQuizTemplate(
                     quizName: quizName,
                     createdAt: createdAt,
                     quizId: doc.id,
@@ -573,7 +571,7 @@ class _QuizTemplateState extends State<QuizTemplate> {
 
                 // play quiz
                 ElevatedButton.icon(
-                  onPressed: _isLoading ? null : () => _playQuiz(context),
+                  onPressed: _isLoading ? null : () => playQuiz(context),
                   icon: _isLoading
                       ? const SizedBox(
                           width: 20,
@@ -598,7 +596,7 @@ class _QuizTemplateState extends State<QuizTemplate> {
   }
 
   /// Play the quiz by loading it and navigating to quiz_generator
-  Future<void> _playQuiz(BuildContext context) async {
+  Future<void> playQuiz(BuildContext context) async {
     setState(() => _isLoading = true);
 
     try {
@@ -611,6 +609,7 @@ class _QuizTemplateState extends State<QuizTemplate> {
       // Set current quiz and navigate
       context.read<QuizProvider>().setCurrentQuiz(quiz);
       Navigator.pushNamed(context, 'quiz_generator');
+      changeNumberOfPlays(widget.quizId, context);
     } catch (e) {
       print('Error loading quiz for play: $e');
       if (mounted) {
@@ -627,35 +626,6 @@ class _QuizTemplateState extends State<QuizTemplate> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  /// Show delete confirmation dialog
-  void _showDeleteConfirmation(BuildContext context, String quizId) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Quiz?'),
-          content: const Text(
-            'Are you sure you want to delete this quiz? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                _deleteQuiz(quizId);
-                Navigator.pop(context);
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   /// Delete quiz from Firebase with proper error handling
@@ -716,5 +686,183 @@ class _QuizTemplateState extends State<QuizTemplate> {
       default:
         return 'Error deleting quiz: $errorCode. Check Firestore security rules.';
     }
+  }
+
+  /// Show delete confirmation dialog
+  void _showDeleteConfirmation(BuildContext context, String quizId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Quiz?'),
+          content: const Text(
+            'Are you sure you want to delete this quiz? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                _deleteQuiz(quizId);
+                Navigator.pop(context);
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class FavoriteQuizTemplate extends StatefulWidget {
+  final String quizName;
+  final Timestamp createdAt;
+  final String quizId;
+  final QueryDocumentSnapshot quizDoc;
+
+  const FavoriteQuizTemplate({
+    super.key,
+    required this.quizName,
+    required this.createdAt,
+    required this.quizId,
+    required this.quizDoc,
+  });
+
+  @override
+  State<FavoriteQuizTemplate> createState() => _FavoriteQuizTemplateState();
+}
+
+class _FavoriteQuizTemplateState extends State<FavoriteQuizTemplate> {
+  bool _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(10),
+        ),
+        padding: EdgeInsets.all(10),
+        child: Column(
+          children: [
+            // Quiz name and date
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.quizName,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 25,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  formatTimeAgo(widget.createdAt),
+                  style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // action buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // delete button
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await firestore
+                        .collection('users')
+                        .doc(auth.currentUser!.uid)
+                        .update({
+                          'favoriteQuizes': FieldValue.arrayRemove([
+                            widget.quizId,
+                          ]),
+                        });
+                  },
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Remove from favorites'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                ),
+
+                // play quiz
+                ElevatedButton.icon(
+                  onPressed: _isLoading ? null : () => playQuiz(context),
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : const Icon(Icons.play_arrow),
+                  label: Text('Play'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Play the quiz by loading it and navigating to quiz_generator
+  Future<void> playQuiz(BuildContext context) async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Convert Firestore document to QuizModel
+      final data = widget.quizDoc.data() as Map<String, dynamic>;
+      final quiz = QuizModel.fromMap(data, widget.quizId);
+
+      if (!mounted) return;
+
+      // Set current quiz and navigate
+      context.read<QuizProvider>().setCurrentQuiz(quiz);
+      Navigator.pushNamed(context, 'quiz_generator');
+      changeNumberOfPlays(widget.quizId, context);
+    } catch (e) {
+      print('Error loading quiz for play: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading quiz: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+}
+
+void changeNumberOfPlays(String quizId, BuildContext context) async {
+  try {
+    await firestore.collection('quizzes').doc(quizId).update({
+      'plays': FieldValue.increment(1),
+    });
+  } catch (e) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Error: $e')));
   }
 }

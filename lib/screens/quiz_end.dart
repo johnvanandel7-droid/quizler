@@ -379,9 +379,23 @@ class _QuizEndState extends State<QuizEnd> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              onPressed: () {
+                              onPressed: () async {
                                 _resetScores();
-                                Navigator.pushNamed(context, 'quiz_generator');
+                                final currentQuiz = quizProvider.currentQuiz;
+                                if (currentQuiz != null) {
+                                  await firestore
+                                      .collection('quizzes')
+                                      .doc(currentQuiz.id)
+                                      .update({
+                                        'plays': FieldValue.increment(1),
+                                      });
+                                }
+                                if (mounted) {
+                                  Navigator.pushNamed(
+                                    context,
+                                    'quiz_generator',
+                                  );
+                                }
                               },
                               child: const Text(
                                 'Play Again',

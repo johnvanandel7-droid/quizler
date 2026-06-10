@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quizler/components/app_bar.dart';
 import 'package:quizler/quiz_provider.dart';
-import 'package:quizler/screens/customize_quiz.dart';
-import 'package:quizler/screens/settings_page.dart';
 import 'package:quizler/constants.dart';
+import 'package:quizler/screens/quiz_detail_screen.dart';
 
 final auth = FirebaseAuth.instance;
 
@@ -139,10 +138,12 @@ class _HomePageState extends State<HomePage> {
                                     name: quiz.name,
                                     description: quiz.description,
                                     onPressed: () {
-                                      quizProvider.setCurrentQuiz(quiz);
-                                      Navigator.pushNamed(
+                                      Navigator.push(
                                         context,
-                                        'quiz_generator',
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              QuizDetailScreen(quiz: quiz),
+                                        ),
                                       );
                                     },
                                   );
@@ -172,6 +173,7 @@ class NavigationDrawer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Spacer(flex: 1),
             DrawerHeader(
               decoration: BoxDecoration(color: Colors.blueGrey[400]),
               child: const Text(
@@ -183,24 +185,26 @@ class NavigationDrawer extends StatelessWidget {
               leading: const Icon(Icons.add_circle_outline, color: kTextColor),
               title: const Text('Make your own quiz'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CustomizeQuiz(),
-                  ),
-                );
+                Navigator.pushNamed(context, 'customize');
               },
             ),
+            Spacer(flex: 1),
             ListTile(
               leading: const Icon(Icons.settings, color: kTextColor),
               title: const Text('Settings'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SettingsPage()),
-                );
+                Navigator.pushNamed(context, 'settings');
               },
             ),
+            Spacer(flex: 1),
+            ListTile(
+              leading: const Icon(Icons.person, color: kTextColor),
+              title: const Text('My Profile'),
+              onTap: () {
+                Navigator.pushNamed(context, 'my_profile');
+              },
+            ),
+            Spacer(flex: 2),
           ],
         ),
       ),
@@ -292,6 +296,16 @@ void _showSearchOptions(BuildContext context) {
               onTap: () {
                 context.read<QuizProvider>().sortByDate();
                 Navigator.pop(dialogContext);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.favorite),
+              title: const Text('Favorite Quizzes'),
+              onTap: () {
+                context.read<QuizProvider>().showFavoriteQuizzes(
+                  auth.currentUser!.uid,
+                );
+                Navigator.pop(context);
               },
             ),
             ListTile(
