@@ -354,7 +354,7 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                   onPressed: () {
                     Navigator.pushNamed(
                       context,
-                      'edit_quiz',
+                      'customize',
                       arguments: {'quizId': quiz.id, 'quizName': quiz.name},
                     );
                   },

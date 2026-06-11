@@ -8,6 +8,7 @@ import 'package:quizler/components/time_ago.dart';
 import 'package:quizler/screens/edit_quiz_screen.dart';
 import 'package:quizler/quiz_provider.dart';
 import 'package:quizler/models/quiz_model.dart';
+import 'package:quizler/screens/quiz_detail_screen.dart';
 
 final auth = FirebaseAuth.instance;
 final firestore = FirebaseFirestore.instance;
@@ -378,7 +379,10 @@ class _ScoreTemplateState extends State<ScoreTemplate> {
 
       context.read<QuizProvider>().setCurrentQuiz(quiz);
 
-      Navigator.pushNamed(context, 'quiz_generator');
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => QuizDetailScreen(quiz: quiz)),
+      );
     } catch (e) {
       print('Error loading quiz: $e');
 
@@ -608,7 +612,10 @@ class _QuizTemplateState extends State<QuizTemplate> {
 
       // Set current quiz and navigate
       context.read<QuizProvider>().setCurrentQuiz(quiz);
-      Navigator.pushNamed(context, 'quiz_generator');
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => QuizDetailScreen(quiz: quiz)),
+      );
       changeNumberOfPlays(widget.quizId, context);
     } catch (e) {
       print('Error loading quiz for play: $e');
@@ -834,7 +841,10 @@ class _FavoriteQuizTemplateState extends State<FavoriteQuizTemplate> {
 
       // Set current quiz and navigate
       context.read<QuizProvider>().setCurrentQuiz(quiz);
-      Navigator.pushNamed(context, 'quiz_generator');
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => QuizDetailScreen(quiz: quiz)),
+      );
       changeNumberOfPlays(widget.quizId, context);
     } catch (e) {
       print('Error loading quiz for play: $e');

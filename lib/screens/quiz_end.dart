@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quizler/quiz_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:quizler/screens/my_profile.dart';
+import 'package:quizler/screens/quiz_detail_screen.dart';
 import 'package:quizler/screens/quiz_generator.dart';
 
 final auth = FirebaseAuth.instance;
@@ -391,9 +391,12 @@ class _QuizEndState extends State<QuizEnd> {
                                       });
                                 }
                                 if (mounted) {
-                                  Navigator.pushNamed(
+                                  Navigator.push(
                                     context,
-                                    'quiz_generator',
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          QuizDetailScreen(quiz: currentQuiz!),
+                                    ),
                                   );
                                 }
                               },

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quizler/quiz_provider.dart';
-import 'package:quizler/components/reusable_card.dart';
 import 'package:quizler/constants.dart';
 import 'package:quizler/models/questions.dart';
 import 'package:firebase_auth/firebase_auth.dart';

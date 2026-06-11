@@ -332,7 +332,7 @@ class _QuizPageGeneratorState extends State<QuizPageGenerator> {
             MCQuestionHelper.isMultipleChoice(currentQuestion.q);
 
         final mcQuestion = isMultipleChoice
-            ? MCQuestionHelper.parseMultipleChoice(currentQuestion!.q)
+            ? MCQuestionHelper.parseMultipleChoice(currentQuestion.q)
             : null;
 
         // Get display text (without MC encoding)
